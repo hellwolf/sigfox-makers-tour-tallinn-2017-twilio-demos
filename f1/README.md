@@ -16,16 +16,17 @@
     - Set function name to 'Twilio Sigfox Demo F1"
     - Set function path to '/f1'
     - Copy paste `f1.js` to the code area
+    - save
 - Configure context variables for the function:
     - `SECRET` : a string that the sigfox device callback invocation will send, in order to authorize the requests
     - `FROM_PHONE_NUMBER` : A twilio phone number that belongs to this account
     - `TO_PHONE_NUMBER` : A mobile number which is to receive the alert messages
 - Test locally with `curl` command
-    - `curl -s -X POST https://runtime-domain.twil.io/f1 -H "content-type: application/json" -d '{"secret":"some_secret", "device": "test", "data": "3239"}'`
+    - `curl -s -X POST https://your-runtime-domain.twil.io/f1 -H "content-type: application/json" -d '{"secret":"some_secret", "device": "test", "data": "3239"}'`
 - Create a new custom callback for the selected [device type](https://backend.sigfox.com/devicetype/)
     - Set type to `DATA/UPLINK`.
     - Channel: URL
-    - Url pattern: https://runtime-domain.twil.io/f1
+    - Url pattern: https://your-runtime-domain.twil.io/f1
     - HTTP Method: POST
     - Body:
       ```

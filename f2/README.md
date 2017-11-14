@@ -11,6 +11,14 @@
 ## Steps
 
 - Buy a new Twilio Number with international SMS capability at least: https://www.twilio.com/console/phone-numbers/search
+- Create a Sync Token Generator:
+    - Open https://www.twilio.com/console/runtime/functions/manage
+    - Create a new function by clicking '+'
+    - Create a blank function
+    - Set function name to "Sync Token Generator"
+    - Set function path to "/sync-token"
+    - Copy paste `sync-token.js` to the code area
+    - save
 - Deploy a new twilio function:
     - Open https://www.twilio.com/console/runtime/functions/manage
     - Create a new function by clicking '+'
@@ -18,6 +26,9 @@
     - Set function name to "Twilio Sigfox Demo F2"
     - Set function path to "/f2"
     - Copy paste `f2.js` to the code area
+    - save
+- Configure context variables for the function:
+    - `SYNC_SERVICE_SID` : set to `default` if to use default sync serivce instance
 - Deploy runtime asset `f2.html`
     - Browse the result at https://your-runtime-domain.twil.io/assets/f2.html
 - Test locally with `curl` command
