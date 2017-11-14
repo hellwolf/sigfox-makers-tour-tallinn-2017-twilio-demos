@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sigfox Twilio Demo F2</title>
+</head>
+<body>
+    <canvas id="myChart" width="400" height="400"></canvas>
+<script
+  src="https://code.jquery.com/jquery-3.2.1.min.js"
+  integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+  crossorigin="anonymous"></script>
+<script type="text/javascript" src="https://media.twiliocdn.com/sdk/js/sync/v0.6/twilio-sync.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.7.0/moment.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.1/Chart.min.js"></script>
+<script>
+    const SYNC_LIST_NAME = 'sigfox-twilio-demo.f2';
+    const SYNC_TOKEN_GENERATOR_URL = "https://gainful-page-7851.twil.io/sync-token";
+    const chartCtx = document.getElementById("myChart").getContext('2d');    
+    var client;
+
+    var chart = new Chart(chartCtx, {
+        type: 'line',
+        data: {
+            datasets: [{
+                label: "Temperature",
+                data: []
+            }]
+        },
+        options: {
+            scales: {
+                xAxes: [{
+                    type: "time",                    
+                    ticks: {
+                    }
+                }],
+                yAxes: [{
+                    ticks: {
+                        min: -30,
+                        max: 40,
+                        stepSize: 5
+                    }
+                }]
+            },
+        },
+    });
+
+    function hex2a(hexx) {
+        var hex = hexx.toString(); //force conversion
+        var str = '';
+        for (var i = 0; i < hex.length; i += 2)
+            str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+        return str;
+    }
+
+    function onData(v) {
+        let x = moment.unix(v.time);
+        let y = parseInt(hex2a(v.data));
+        console.log(x, y);
+        chart.data.datasets[0].data.push({
+            x: x,
+            y: y
+        });
+        chart.update();
+    }
+
+    $.get(SYNC_TOKEN_GENERATOR_URL, function (data) {
+        console.log("creating twilio client");
+        client = new Twilio.Sync.Client(data.token);
+        client
+            .list(SYNC_LIST_NAME)
+            .then(list => {
+                list.getItems({ order : "desc", pageSize: 100 })
+                .then((paginator) => {
+                    paginator.items.reverse().forEach(item => {
+                        onData(item.data.value);
+                    });
+                    list.on('itemAdded', item => {
+                        onData(item.data.value);
+                    });
+                });
+            });
+    });
+
+    setInterval(function () {
+        $.get(SYNC_TOKEN_GENERATOR_URL, function (data) {
+            console.log("updating twilio client token");
+            client.updateToken(data.token);
+        });
+    }, 50 * 60 * 1000);
+</script>
+</body>
+</html>
