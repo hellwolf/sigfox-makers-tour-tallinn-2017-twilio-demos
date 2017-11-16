@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sigfox Twilio Demo F3</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+    <style type="text/less">
+    .map-cont {
+        .map {
+          height: 420px;
+          margin-bottom: 40px;
+          p {
+            color: black;
+          }
+          .infowindow-label {
+            margin-left: 15px;
+            margin-right: -5px;
+            margin-top: 15px;
+            h1 {
+              font-size: 24px;
+              margin-bottom: 17px;
+              color: black;
+              text-decoration: underline;
+              text-align: center;
+            }
+            p {
+              font-size: 14px;
+              margin-bottom: 15px;
+              span {
+                font-size: 16px;
+              }
+              span.label {
+                display: inline-block;
+                min-width: 90px;
+              }
+              .value {
+                margin-right: 10px;
+                margin-left: 7px;
+                font-weight: 400;
+              }
+            }
+          }
+        }
+    }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/less.js/2.7.3/less.min.js"></script>
+</head>
+<body>
+    <div class="navbar navbar-custom navbar-fixed-top">
+        <div class="container">
+            <div class="row map-cont">
+                <div class="col-xs-6">
+                    <div class="map" id="map"></div>
+                </div>
+                <div class="col-xs-6">
+                    <h4>Heatpump history of: <span class="name-labels"></span></h4>
+                    <canvas id="myChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+<!-- Latest compiled and minified JavaScript -->
+<script
+  src="https://code.jquery.com/jquery-3.2.1.min.js"
+  integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+  crossorigin="anonymous"></script>
+<script type="text/javascript"
+src="https://media.twiliocdn.com/sdk/js/client/v1.4/twilio.min.js"></script>
+<script type="text/javascript" src="https://media.twiliocdn.com/sdk/js/sync/v0.6/twilio-sync.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.7.0/moment.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.1/Chart.min.js"></script>
+<script
+    src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+    integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
+    crossorigin="anonymous"></script>
+<script>
+    const SYNC_OBJECT_NAME_PREFIX = 'sigfox-twilio-demo.f3.';
+    const PLACES_SYNC_MAP_NAME = SYNC_OBJECT_NAME_PREFIX + 'places';
+    const STATUS_SYNC_DOC_NAME_PREFIX = SYNC_OBJECT_NAME_PREFIX + 'status.';
+    const READINGS_SYNC_LIST_NAME_PREFIX = SYNC_OBJECT_NAME_PREFIX + 'readings.'
+    const SYNC_TOKEN_GENERATOR_URL = "https://gainful-page-7851.twil.io/sync-token";
+    const mapElement = document.getElementById("map");
+    var googleMap;
+    var client;
+    var chart;
+    var places = {};
+
+    function hex2a(hexx) {
+        var hex = hexx.toString(); //force conversion
+        var str = '';
+        for (var i = 0; i < hex.length; i += 2)
+            str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+        return str;
+    }
+
+    function onData(v) {
+        let x = moment.unix(v.time);
+        let y = parseInt(hex2a(v.data));
+        console.log(x, y);
+        chart.data.datasets[0].data.push({
+            x: x,
+            y: y
+        });
+        chart.update();
+    }
+
+    function initChart() {
+        const chartCtx = document.getElementById("myChart").getContext('2d');
+        chart = new Chart(chartCtx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: "Temperature",
+                    data: []
+                }]
+            },
+            options: {
+                scales: {
+                    xAxes: [{
+                        type: "time",                    
+                        ticks: {
+                        }
+                    }],
+                    yAxes: [{
+                        ticks: {
+                            min: 0,
+                            max: 40,
+                            stepSize: 5
+                        }
+                    }]
+                },
+            },
+        });
+    }
+
+    function viewChart(placeId) {
+        let place = places[placeId];
+        $(".name-labels").text(place.name);
+        client
+        .list(READINGS_SYNC_LIST_NAME_PREFIX + placeId)
+        .then(list => {
+            list.getItems({ order : "desc", pageSize: 100 })
+            .then((paginator) => {
+                let data = paginator.items.reverse().map(item => {
+                    let v = item.data.value;
+                    return {
+                        x: moment.unix(v.time),
+                        y: parseInt(hex2a(v.data)),
+                    };
+                });
+                chart.data.datasets[0].data = data;
+                chart.update();
+            });
+        });
+    }
+
+    function callTechnician(placeId) {
+          Twilio.Device.connect({ number: "+37253932314" });
+    }
+
+    function initPlaces() {
+        const markerGreenIcon = new google.maps.MarkerImage("http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|008000",
+            new google.maps.Size(21, 34),
+            new google.maps.Point(0,0),
+            new google.maps.Point(10, 34));
+        const markerYellowIcon = new google.maps.MarkerImage("http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|FFFF00",
+            new google.maps.Size(21, 34),
+            new google.maps.Point(0,0),
+            new google.maps.Point(10, 34));
+        const markerRedIcon = new google.maps.MarkerImage("http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|FF0000",
+            new google.maps.Size(21, 34),
+            new google.maps.Point(0,0),
+            new google.maps.Point(10, 34));
+        const markerShadow = new google.maps.MarkerImage("http://chart.apis.google.com/chart?chst=d_map_pin_shadow",
+            new google.maps.Size(40, 37),
+            new google.maps.Point(0, 0),
+            new google.maps.Point(12, 35));
+        const normalInfoContent = '<div class="infowindow-label"><button class="btn btn-primary" onclick="viewChart(PLACE_ID)">View Chart</button><br></div>';
+        const alertInfoContent = '<div class="infowindow-label"><button class="btn btn-primary" onclick="viewChart(PLACE_ID)">View Chart</button><br><button class="btn btn-primary" onclick="callTechnician(PLACE_ID)">Call Technician</button><br></div>';
+        const maintenanceInfoContent = '<div class="infowindow-label"><button class="btn btn-primary" onclick="viewChart(PLACE_ID)">View Chart</button><br><button class="btn btn-primary">Mark Resolved</button></div>';
+
+        function selectInfoContentForStatus(placeId, status) {
+            switch(status) {
+            case "alert":
+                return alertInfoContent.replace(/PLACE_ID/g, "'"+ placeId +"'");
+            case "maintenance":
+                return maintenanceInfoContent.replace(/PLACE_ID/g, "'"+ placeId +"'");
+            default:
+                return normalInfoContent.replace(/PLACE_ID/g, "'"+ placeId +"'");
+            }
+        }
+
+        function selectMarkerIconForStatus(status) {
+            switch(status) {
+            case "alert":
+                return markerRedIcon;
+            case "maintenance":
+                return markerYellowIcon;
+            default:
+                return markerGreenIcon;
+            }
+        }
+
+        function setupPlace(placeId) {
+            let place = places[placeId];
+            client
+            .document(STATUS_SYNC_DOC_NAME_PREFIX + placeId)
+            .then(doc => {
+                place.marker = new google.maps.Marker({
+                    map: googleMap,
+                    position: place.position,
+                    icon: selectMarkerIconForStatus(doc.value.value),
+                    shadow: markerShadow,
+                });
+                place.infowindow = new google.maps.InfoWindow({
+                    content: selectInfoContentForStatus(placeId, doc.value.value),
+                });
+                doc.on("updated", (value) => {
+                    console.log("place status updated", placeId, value);
+                    place.marker.setIcon(selectMarkerIconForStatus(value.value));
+                    place.infowindow.setContent(selectInfoContentForStatus(placeId, value.value));
+                });
+                google.maps.event.addListener(place.marker, 'click', function(e) {
+                  place.infowindow.open(googleMap, this);
+                });
+            })
+            .catch(err => {
+                console.error("initPlaces: setupPlace: ", err);
+            });
+        }
+
+        function fetchPlaces() {
+            client
+            .map(PLACES_SYNC_MAP_NAME)
+            .then(map => {
+                map
+                .getItems({ order : "desc", pageSize: 100 })
+                .then((paginator) => {
+                    paginator.items.forEach(item => {
+                        console.log(item);
+                        let placeId = item.key;
+                        let value = item.value;
+                        let place = places[placeId] = {
+                            name: value.name,
+                            position: value.position,
+                        };
+                        setupPlace(placeId);
+                        googleMap.panTo(place.position);
+                    });
+                })
+                .catch(err => {
+                    console.error("initPlaces: fetchPlaces: ", err);
+                });
+            });
+        }
+
+        initChart();
+        fetchPlaces();
+    }
+
+    function tryInit() {
+        if (map && client) {
+            console.log("initializing...");
+            initPlaces();
+        }
+    }
+
+    function createChart() {
+        const chartCtx = document.getElementById("myChart").getContext('2d');    
+        var chart = new Chart(chartCtx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: "Temperature",
+                    data: []
+                }]
+            },
+            options: {
+                scales: {
+                    xAxes: [{
+                        type: "time",                    
+                        ticks: {
+                        }
+                    }],
+                    yAxes: [{
+                        ticks: {
+                            min: -30,
+                            max: 40,
+                            stepSize: 5
+                        }
+                    }]
+                },
+            },
+        });
+    }
+
+    $.get(SYNC_TOKEN_GENERATOR_URL, function (data) {
+        console.log("creating twilio client");
+        client = new Twilio.Sync.Client(data.sync_token);
+        Twilio.Device.setup(data.twiml_token);
+        tryInit();
+    });
+
+    function onMapReady() {
+        console.log("onMapReady");
+        googleMap = new google.maps.Map(mapElement, {
+          zoom: 14
+        });
+        tryInit();
+    }
+
+    setInterval(function () {
+        $.get(SYNC_TOKEN_GENERATOR_URL, function (data) {
+            console.log("updating twilio client token");
+            client.updateToken(data.sync_token);
+            Twilio.Device.setup(data.twiml_token);            
+        });
+    }, 50 * 60 * 1000);
+</script>
+<script src ="https://maps.googleapis.com/maps/api/js?key=AIzaSyCzHKGHhCak-6pSZYzANjXOyZL4QoRLZW0&callback=onMapReady"></script>
+</body>
+</html>

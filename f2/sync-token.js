@@ -10,6 +10,23 @@
 *   - Create an API Key (https://www.twilio.com/console/runtime/api-keys)
  */
 
+const ClientCapability = Twilio.jwt.ClientCapability;
+
+function getTwimlAppToken(context) {
+  const capability = new ClientCapability({
+    accountSid: context.ACCOUNT_SID,
+    authToken: context.AUTH_TOKEN,
+    ttl : parseInt(context.TOKEN_TTL)
+  });
+
+  capability.addScope(
+    new ClientCapability.OutgoingClientScope({
+      applicationSid: context.TWIML_APP_SID})
+  );
+
+	return capability.toJwt();
+}
+
 exports.handler = function(context, event, callback) {  
   // make sure you enable ACCOUNT_SID and AUTH_TOKEN in Functions/Configuration
   const ACCOUNT_SID = context.ACCOUNT_SID;
@@ -37,5 +54,8 @@ exports.handler = function(context, event, callback) {
   accessToken.addGrant(syncGrant);
   accessToken.identity = IDENTITY;
 
-  callback(null, { token: accessToken.toJwt() });
+  callback(null, {
+    sync_token: accessToken.toJwt(),
+    twiml_token: getTwimlAppToken(context)
+  });
 }

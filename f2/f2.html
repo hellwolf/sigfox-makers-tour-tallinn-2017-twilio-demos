@@ -4,7 +4,7 @@
     <title>Sigfox Twilio Demo F2</title>
 </head>
 <body>
-    <canvas id="myChart" width="400" height="400"></canvas>
+    <canvas id="myChart"></canvas>
 <script
   src="https://code.jquery.com/jquery-3.2.1.min.js"
   integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
@@ -35,7 +35,7 @@
                 }],
                 yAxes: [{
                     ticks: {
-                        min: -30,
+                        min: 0,
                         max: 40,
                         stepSize: 5
                     }
@@ -65,7 +65,7 @@
 
     $.get(SYNC_TOKEN_GENERATOR_URL, function (data) {
         console.log("creating twilio client");
-        client = new Twilio.Sync.Client(data.token);
+        client = new Twilio.Sync.Client(data.sync_token);
         client
             .list(SYNC_LIST_NAME)
             .then(list => {
@@ -84,7 +84,7 @@
     setInterval(function () {
         $.get(SYNC_TOKEN_GENERATOR_URL, function (data) {
             console.log("updating twilio client token");
-            client.updateToken(data.token);
+            client.updateToken(data.sync_token);
         });
     }, 50 * 60 * 1000);
 </script>
